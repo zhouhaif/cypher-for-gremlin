@@ -27,6 +27,7 @@ import static org.opencypher.gremlin.translation.Tokens.PROJECTION_ID;
 import static org.opencypher.gremlin.translation.Tokens.PROJECTION_INV;
 import static org.opencypher.gremlin.translation.Tokens.PROJECTION_OUTV;
 import static org.opencypher.gremlin.translation.Tokens.PROJECTION_RELATIONSHIP;
+import static org.slf4j.LoggerFactory.getLogger;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ import org.apache.tinkerpop.gremlin.structure.Element;
 import org.apache.tinkerpop.gremlin.structure.Property;
 import org.apache.tinkerpop.gremlin.structure.T;
 import org.apache.tinkerpop.gremlin.structure.util.detached.DetachedVertexProperty;
+import org.apache.tinkerpop.gremlin.structure.util.reference.ReferenceVertex;
 import org.opencypher.gremlin.translation.Tokens;
 import org.opencypher.v9_0.util.symbols.CypherType;
 import org.opencypher.v9_0.util.symbols.IntegerType;
@@ -50,8 +52,10 @@ import org.opencypher.v9_0.util.symbols.ListType;
 import org.opencypher.v9_0.util.symbols.NodeType;
 import org.opencypher.v9_0.util.symbols.PathType;
 import org.opencypher.v9_0.util.symbols.RelationshipType;
+import org.slf4j.Logger;
 
 public final class ReturnNormalizer {
+    private static final Logger logger = getLogger(ReturnNormalizer.class);
     private final Map<String, CypherType> variableTypes;
 
     private ReturnNormalizer(Map<String, CypherType> variableTypes) {
@@ -68,8 +72,19 @@ public final class ReturnNormalizer {
             throw new IllegalStateException("Invalid response: expected Map, got String." +
                 " Probable cause: 'serializeResultToString' set to 'true' in Gremlin serializer config");
         }
+        Object a = null;
+        try {
+            a = normalizeValue(row);
+            return (Map<String, Object>) a;
+        } catch (Exception e) {
+            if (a != null) {
+                logger.error(a.getClass().toString());
+            } else {
+                logger.error("a is null");
+            }
+            throw e;
+        }
 
-        return (Map<String, Object>) normalizeValue(row);
     }
 
     private Object normalizeValue(Object value) {
@@ -89,6 +104,10 @@ public final class ReturnNormalizer {
             return null;
         } else if (value instanceof Traverser) {
             return normalize(((Traverser) value).get());
+        } else if(value instanceof ReferenceVertex){
+            Map<String,String> map = new HashMap<>();
+            map.put("value",value.toString());
+            return map;
         }
         return value;
     }
